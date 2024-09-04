@@ -32,6 +32,7 @@ type OptionsFields struct {
 	InterruptionQueue       *string
 	ReservedENIs            *int
 	MaxPodsExtraCapacity    *int
+	MaxPodsLimit            *int
 }
 
 func Options(overrides ...OptionsFields) *options.Options {
@@ -50,5 +51,6 @@ func Options(overrides ...OptionsFields) *options.Options {
 		InterruptionQueue:       lo.FromPtrOr(opts.InterruptionQueue, ""),
 		ReservedENIs:            lo.FromPtrOr(opts.ReservedENIs, 0),
 		MaxPodsExtraCapacity:    lo.FromPtrOr(opts.MaxPodsExtraCapacity, 2),
+		MaxPodsLimit:            lo.FromPtrOr(opts.MaxPodsLimit, -1),
 	}
 }
