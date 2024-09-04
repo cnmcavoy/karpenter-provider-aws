@@ -34,6 +34,7 @@ type OptionsFields struct {
 	ReservedENIs            *int
 	DisableDryRun           *bool
 	MaxPodsExtraCapacity    *int
+	MaxPodsLimit            *int
 }
 
 func Options(overrides ...OptionsFields) *options.Options {
@@ -54,5 +55,6 @@ func Options(overrides ...OptionsFields) *options.Options {
 		ReservedENIs:            lo.FromPtrOr(opts.ReservedENIs, 0),
 		DisableDryRun:           lo.FromPtrOr(opts.DisableDryRun, false),
 		MaxPodsExtraCapacity:    lo.FromPtrOr(opts.MaxPodsExtraCapacity, 2),
+		MaxPodsLimit:            lo.FromPtrOr(opts.MaxPodsLimit, -1),
 	}
 }
