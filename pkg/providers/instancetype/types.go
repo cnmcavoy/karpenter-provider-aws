@@ -558,11 +558,17 @@ func pods(ctx context.Context, info ec2types.InstanceTypeInfo, amiFamily amifami
 		count = ENILimitedPods(ctx, info).Value()
 	default:
 		count = 110
-
 	}
 	if lo.FromPtr(podsPerCore) > 0 && amiFamily.FeatureFlags().PodsPerCoreEnabled {
 		count = lo.Min([]int64{int64(lo.FromPtr(podsPerCore)) * int64(lo.FromPtr(info.VCpuInfo.DefaultVCpus)), count})
 	}
+
+	// if maxPodsLimit is set, clamp the pod count to maxPodsLimit at maximum
+	maxPodsLimit := int64(options.FromContext(ctx).MaxPodsLimit)
+	if maxPodsLimit >= 0 && count > maxPodsLimit {
+		count = maxPodsLimit
+	}
+
 	return resources.Quantity(fmt.Sprint(count))
 }
 
