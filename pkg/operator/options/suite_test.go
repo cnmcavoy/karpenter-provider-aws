@@ -63,7 +63,8 @@ var _ = Describe("Options", func() {
 			"--vm-memory-overhead-percent", "0.1",
 			"--interruption-queue", "env-cluster",
 			"--reserved-enis", "10",
-			"--max-pods-extra-capacity", "1")
+			"--max-pods-extra-capacity", "1",
+			"--max-pods-limit", "110")
 		Expect(err).ToNot(HaveOccurred())
 		expectOptionsEqual(opts, test.Options(test.OptionsFields{
 			ClusterCABundle:         lo.ToPtr("env-bundle"),
@@ -74,6 +75,7 @@ var _ = Describe("Options", func() {
 			InterruptionQueue:       lo.ToPtr("env-cluster"),
 			ReservedENIs:            lo.ToPtr(10),
 			MaxPodsExtraCapacity:    lo.ToPtr(1),
+			MaxPodsLimit:            lo.ToPtr(110),
 		}))
 	})
 	It("should correctly fallback to env vars when CLI flags aren't set", func() {
@@ -85,6 +87,7 @@ var _ = Describe("Options", func() {
 		os.Setenv("INTERRUPTION_QUEUE", "env-cluster")
 		os.Setenv("RESERVED_ENIS", "10")
 		os.Setenv("MAX_PODS_EXTRA_CAPACITY", "1")
+		os.Setenv("MAX_PODS_LIMIT", "110")
 
 		// Add flags after we set the environment variables so that the parsing logic correctly refers
 		// to the new environment variable values
@@ -100,6 +103,7 @@ var _ = Describe("Options", func() {
 			InterruptionQueue:       lo.ToPtr("env-cluster"),
 			ReservedENIs:            lo.ToPtr(10),
 			MaxPodsExtraCapacity:    lo.ToPtr(1),
+			MaxPodsLimit:            lo.ToPtr(110),
 		}))
 	})
 
