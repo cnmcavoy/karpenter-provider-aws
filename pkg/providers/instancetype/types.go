@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 
 	v1 "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
@@ -450,7 +449,7 @@ func pods(ctx context.Context, info *ec2.InstanceTypeInfo, amiFamily amifamily.A
 	if maxPodsLimit >= 0 && count > maxPodsLimit {
 		count = maxPodsLimit
 	}
-	log.FromContext(ctx).V(1).Info(fmt.Sprintf("calculating max-pods for instance type: %s, maxPodsLimit: %v, maxPods: %v", *info.InstanceType, maxPodsLimit, count))
+	//log.FromContext(ctx).V(1).Info(fmt.Sprintf("calculating max-pods for instance type: %s, maxPodsLimit: %v, maxPods: %v", *info.InstanceType, maxPodsLimit, count))
 
 	return resources.Quantity(fmt.Sprint(count))
 }
