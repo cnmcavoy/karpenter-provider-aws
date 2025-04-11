@@ -299,10 +299,21 @@ func (p *DefaultProvider) UpdateInstanceTypeCapacityFromNode(ctx context.Context
 
 	// Update cache if non-existent or actual capacity is less than or equal to cached value
 	actualCapacity := node.Status.Capacity.Memory()
-	if cachedCapacity, ok := p.discoveredCapacityCache.Get(key); !ok || actualCapacity.Cmp(cachedCapacity.(resource.Quantity)) < 1 {
-		log.FromContext(ctx).WithValues("memory-capacity", actualCapacity, "instance-type", instanceTypeName).V(1).Info("updating discovered capacity cache")
+	if cachedCapacity, ok := p.discoveredCapacityCache.Get(key); !ok {
+		log.FromContext(ctx).WithValues("memory-capacity", actualCapacity, "instance-type", instanceTypeName, "key", key, "cache-value", cachedCapacity).Info("no cached value - updating discovered capacity cache")
 		p.discoveredCapacityCache.SetDefault(key, *actualCapacity)
+	} else if actualCapacity.Cmp(cachedCapacity.(resource.Quantity)) < 1 {
+		log.FromContext(ctx).WithValues("memory-capacity", actualCapacity, "instance-type", instanceTypeName, "key", key, "cache-value", cachedCapacity).Info("updating discovered capacity cache")
+		p.discoveredCapacityCache.SetDefault(key, *actualCapacity)
+	} else {
+		log.FromContext(ctx).WithValues("memory-capacity", actualCapacity, "instance-type", instanceTypeName, "key", key, "cache-value", cachedCapacity).Info("not updating discovered capacity cache")
 	}
+	/*
+		if cachedCapacity, ok := p.discoveredCapacityCache.Get(key); !ok || actualCapacity.Cmp(cachedCapacity.(resource.Quantity)) < 1 {
+			log.FromContext(ctx).WithValues("memory-capacity", actualCapacity, "instance-type", instanceTypeName).V(1).Info("updating discovered capacity cache")
+			p.discoveredCapacityCache.SetDefault(key, *actualCapacity)
+		}
+	*/
 	return nil
 }
 
