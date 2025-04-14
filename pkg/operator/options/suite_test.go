@@ -64,7 +64,8 @@ var _ = Describe("Options", func() {
 			"--interruption-queue", "env-cluster",
 			"--reserved-enis", "10",
 			"--max-pods-extra-capacity", "1",
-			"--max-pods-limit", "110")
+			"--max-pods-limit", "110",
+			"--hostname-type", "ip-name")
 		Expect(err).ToNot(HaveOccurred())
 		expectOptionsEqual(opts, test.Options(test.OptionsFields{
 			ClusterCABundle:         lo.ToPtr("env-bundle"),
@@ -76,6 +77,7 @@ var _ = Describe("Options", func() {
 			ReservedENIs:            lo.ToPtr(10),
 			MaxPodsExtraCapacity:    lo.ToPtr(1),
 			MaxPodsLimit:            lo.ToPtr(110),
+			HostnameType:            lo.ToPtr("ip-name"),
 		}))
 	})
 	It("should correctly fallback to env vars when CLI flags aren't set", func() {
@@ -88,6 +90,7 @@ var _ = Describe("Options", func() {
 		os.Setenv("RESERVED_ENIS", "10")
 		os.Setenv("MAX_PODS_EXTRA_CAPACITY", "1")
 		os.Setenv("MAX_PODS_LIMIT", "110")
+		os.Setenv("HOSTNAME_TYPE", "ip-name")
 
 		// Add flags after we set the environment variables so that the parsing logic correctly refers
 		// to the new environment variable values
@@ -104,6 +107,7 @@ var _ = Describe("Options", func() {
 			ReservedENIs:            lo.ToPtr(10),
 			MaxPodsExtraCapacity:    lo.ToPtr(1),
 			MaxPodsLimit:            lo.ToPtr(110),
+			HostnameType:            lo.ToPtr("ip-name"),
 		}))
 	})
 
@@ -129,6 +133,10 @@ var _ = Describe("Options", func() {
 		})
 		It("should fail when maxPodsExtraCapacity is negative", func() {
 			err := opts.Parse(fs, "--cluster-name", "test-cluster", "--max-pods-extra-capacity", "-1")
+			Expect(err).To(HaveOccurred())
+		})
+		It("should fail when hostnameType has an invalid value", func() {
+			err := opts.Parse(fs, "--cluster-name", "test-cluster", "--hostname-type", "-1")
 			Expect(err).To(HaveOccurred())
 		})
 	})

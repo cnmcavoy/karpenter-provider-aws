@@ -29,6 +29,7 @@ func (o *Options) Validate() error {
 		o.validateReservedENIs(),
 		o.validateMaxPodsExtraCapacity(),
 		o.validateRequiredFields(),
+		o.validateHostnameType(),
 	)
 }
 
@@ -69,6 +70,13 @@ func (o *Options) validateMaxPodsExtraCapacity() error {
 func (o *Options) validateRequiredFields() error {
 	if o.ClusterName == "" {
 		return fmt.Errorf("missing field, cluster-name")
+	}
+	return nil
+}
+
+func (o Options) validateHostnameType() error {
+	if o.HostnameType != "ip-name" && o.HostnameType != "resource-name" {
+		return fmt.Errorf("invalid field, hostname-type. Valid values are ip-name or resource-name")
 	}
 	return nil
 }

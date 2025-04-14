@@ -16,6 +16,7 @@ package launchtemplate
 
 import (
 	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -26,6 +27,7 @@ import (
 	"sigs.k8s.io/karpenter/pkg/operator/options"
 
 	v1 "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
+	karpoptions "github.com/aws/karpenter-provider-aws/pkg/operator/options"
 	"github.com/aws/karpenter-provider-aws/pkg/providers/amifamily"
 	"github.com/aws/karpenter-provider-aws/pkg/utils"
 )
@@ -103,6 +105,18 @@ func (b *CreateLaunchTemplateInputBuilder) Build(ctx context.Context) *ec2.Creat
 		})
 	}
 	networkInterfaces := generateNetworkInterfaces(b.options, b.clusterIPFamily)
+
+	hostnameType := karpoptions.FromContext(ctx).HostnameType
+	privDNSNameOptions := &ec2types.LaunchTemplatePrivateDnsNameOptionsRequest{}
+	if hostnameType == "resource-name" {
+		privDNSNameOptions = &ec2types.LaunchTemplatePrivateDnsNameOptionsRequest{
+			HostnameType:                 ec2types.HostnameTypeResourceName,
+			EnableResourceNameDnsARecord: aws.Bool(true),
+		}
+	} else {
+		privDNSNameOptions = nil
+	}
+
 	lt := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateName: lo.ToPtr(LaunchTemplateName(b.options)),
 		LaunchTemplateData: &ec2types.RequestLaunchTemplateData{
@@ -114,9 +128,10 @@ func (b *CreateLaunchTemplateInputBuilder) Build(ctx context.Context) *ec2.Creat
 				Enabled: lo.ToPtr(b.options.DetailedMonitoring),
 			},
 			// If the network interface is defined, the security groups are defined within it
-			SecurityGroupIds: lo.Ternary(networkInterfaces != nil, nil, lo.Map(b.options.SecurityGroups, func(s v1.SecurityGroup, _ int) string { return s.ID })),
-			UserData:         lo.ToPtr(b.userData),
-			ImageId:          lo.ToPtr(b.options.AMIID),
+			SecurityGroupIds:      lo.Ternary(networkInterfaces != nil, nil, lo.Map(b.options.SecurityGroups, func(s v1.SecurityGroup, _ int) string { return s.ID })),
+			UserData:              lo.ToPtr(b.userData),
+			ImageId:               lo.ToPtr(b.options.AMIID),
+			PrivateDnsNameOptions: privDNSNameOptions,
 			MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptionsRequest{
 				HttpEndpoint:     ec2types.LaunchTemplateInstanceMetadataEndpointState(lo.FromPtr(b.options.MetadataOptions.HTTPEndpoint)),
 				HttpProtocolIpv6: ec2types.LaunchTemplateInstanceMetadataProtocolIpv6(lo.FromPtr(b.options.MetadataOptions.HTTPProtocolIPv6)),
