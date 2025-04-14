@@ -254,10 +254,12 @@ func (p *DefaultProvider) createLaunchTemplate(ctx context.Context, options *ami
 // you need UserData, AmiID, tags, blockdevicemappings, instance profile,
 func GetCreateLaunchTemplateInput(
 	ctx context.Context,
-	options *amifamily.LaunchTemplate,
+	amioptions *amifamily.LaunchTemplate,
 	ClusterIPFamily corev1.IPFamily,
 	userData string,
 ) *ec2.CreateLaunchTemplateInput {
+	hostnameType := options.FromContext(ctx).HostnameType
+	options := amioptions
 	launchTemplateDataTags := []ec2types.LaunchTemplateTagSpecificationRequest{
 		{ResourceType: ec2types.ResourceTypeNetworkInterface, Tags: utils.EC2MergeTags(options.Tags)},
 	}
@@ -265,43 +267,89 @@ func GetCreateLaunchTemplateInput(
 		launchTemplateDataTags = append(launchTemplateDataTags, ec2types.LaunchTemplateTagSpecificationRequest{ResourceType: ec2types.ResourceTypeSpotInstancesRequest, Tags: utils.EC2MergeTags(options.Tags)})
 	}
 	networkInterfaces := generateNetworkInterfaces(options, ClusterIPFamily)
-	lt := &ec2.CreateLaunchTemplateInput{
-		LaunchTemplateName: aws.String(LaunchTemplateName(options)),
-		LaunchTemplateData: &ec2types.RequestLaunchTemplateData{
-			BlockDeviceMappings: blockDeviceMappings(options.BlockDeviceMappings),
-			IamInstanceProfile: &ec2types.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				Name: aws.String(options.InstanceProfile),
+	var lt *ec2.CreateLaunchTemplateInput
+	if hostnameType == "resource-name" {
+		lt = &ec2.CreateLaunchTemplateInput{
+			LaunchTemplateName: aws.String(LaunchTemplateName(options)),
+			LaunchTemplateData: &ec2types.RequestLaunchTemplateData{
+				BlockDeviceMappings: blockDeviceMappings(options.BlockDeviceMappings),
+				IamInstanceProfile: &ec2types.LaunchTemplateIamInstanceProfileSpecificationRequest{
+					Name: aws.String(options.InstanceProfile),
+				},
+				Monitoring: &ec2types.LaunchTemplatesMonitoringRequest{
+					Enabled: aws.Bool(options.DetailedMonitoring),
+				},
+				// If the network interface is defined, the security groups are defined within it
+				SecurityGroupIds: lo.Ternary(networkInterfaces != nil, nil, lo.Map(options.SecurityGroups, func(s v1.SecurityGroup, _ int) string { return s.ID })),
+				UserData:         aws.String(userData),
+				ImageId:          aws.String(options.AMIID),
+				PrivateDnsNameOptions: &ec2types.LaunchTemplatePrivateDnsNameOptionsRequest{
+					HostnameType:                 ec2types.HostnameTypeResourceName,
+					EnableResourceNameDnsARecord: aws.Bool(true),
+				},
+				MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptionsRequest{
+					HttpEndpoint:     ec2types.LaunchTemplateInstanceMetadataEndpointState(lo.FromPtr(options.MetadataOptions.HTTPEndpoint)),
+					HttpProtocolIpv6: ec2types.LaunchTemplateInstanceMetadataProtocolIpv6(lo.FromPtr(options.MetadataOptions.HTTPProtocolIPv6)),
+					//Will be removed when we update options.MetadataOptions.HTTPPutResponseHopLimit type to be int32
+					//nolint: gosec
+					HttpPutResponseHopLimit: lo.ToPtr(int32(lo.FromPtr(options.MetadataOptions.HTTPPutResponseHopLimit))),
+					HttpTokens:              ec2types.LaunchTemplateHttpTokensState(lo.FromPtr(options.MetadataOptions.HTTPTokens)),
+					// We statically set the InstanceMetadataTags to "disabled" for all new instances since
+					// account-wide defaults can override instance defaults on metadata settings
+					// This can cause instance failure on accounts that default to instance tags since Karpenter
+					// can't support instance tags with its current tags (e.g. kubernetes.io/cluster/*, karpenter.k8s.aws/ec2nodeclass)
+					// See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html#instance-metadata-options-order-of-precedence
+					InstanceMetadataTags: ec2types.LaunchTemplateInstanceMetadataTagsStateDisabled,
+				},
+				NetworkInterfaces: networkInterfaces,
+				TagSpecifications: launchTemplateDataTags,
 			},
-			Monitoring: &ec2types.LaunchTemplatesMonitoringRequest{
-				Enabled: aws.Bool(options.DetailedMonitoring),
+			TagSpecifications: []ec2types.TagSpecification{
+				{
+					ResourceType: ec2types.ResourceTypeLaunchTemplate,
+					Tags:         utils.EC2MergeTags(options.Tags),
+				},
 			},
-			// If the network interface is defined, the security groups are defined within it
-			SecurityGroupIds: lo.Ternary(networkInterfaces != nil, nil, lo.Map(options.SecurityGroups, func(s v1.SecurityGroup, _ int) string { return s.ID })),
-			UserData:         aws.String(userData),
-			ImageId:          aws.String(options.AMIID),
-			MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptionsRequest{
-				HttpEndpoint:     ec2types.LaunchTemplateInstanceMetadataEndpointState(lo.FromPtr(options.MetadataOptions.HTTPEndpoint)),
-				HttpProtocolIpv6: ec2types.LaunchTemplateInstanceMetadataProtocolIpv6(lo.FromPtr(options.MetadataOptions.HTTPProtocolIPv6)),
-				//Will be removed when we update options.MetadataOptions.HTTPPutResponseHopLimit type to be int32
-				//nolint: gosec
-				HttpPutResponseHopLimit: lo.ToPtr(int32(lo.FromPtr(options.MetadataOptions.HTTPPutResponseHopLimit))),
-				HttpTokens:              ec2types.LaunchTemplateHttpTokensState(lo.FromPtr(options.MetadataOptions.HTTPTokens)),
-				// We statically set the InstanceMetadataTags to "disabled" for all new instances since
-				// account-wide defaults can override instance defaults on metadata settings
-				// This can cause instance failure on accounts that default to instance tags since Karpenter
-				// can't support instance tags with its current tags (e.g. kubernetes.io/cluster/*, karpenter.k8s.aws/ec2nodeclass)
-				// See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html#instance-metadata-options-order-of-precedence
-				InstanceMetadataTags: ec2types.LaunchTemplateInstanceMetadataTagsStateDisabled,
+		}
+	} else {
+		lt = &ec2.CreateLaunchTemplateInput{
+			LaunchTemplateName: aws.String(LaunchTemplateName(options)),
+			LaunchTemplateData: &ec2types.RequestLaunchTemplateData{
+				BlockDeviceMappings: blockDeviceMappings(options.BlockDeviceMappings),
+				IamInstanceProfile: &ec2types.LaunchTemplateIamInstanceProfileSpecificationRequest{
+					Name: aws.String(options.InstanceProfile),
+				},
+				Monitoring: &ec2types.LaunchTemplatesMonitoringRequest{
+					Enabled: aws.Bool(options.DetailedMonitoring),
+				},
+				// If the network interface is defined, the security groups are defined within it
+				SecurityGroupIds: lo.Ternary(networkInterfaces != nil, nil, lo.Map(options.SecurityGroups, func(s v1.SecurityGroup, _ int) string { return s.ID })),
+				UserData:         aws.String(userData),
+				ImageId:          aws.String(options.AMIID),
+				MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptionsRequest{
+					HttpEndpoint:     ec2types.LaunchTemplateInstanceMetadataEndpointState(lo.FromPtr(options.MetadataOptions.HTTPEndpoint)),
+					HttpProtocolIpv6: ec2types.LaunchTemplateInstanceMetadataProtocolIpv6(lo.FromPtr(options.MetadataOptions.HTTPProtocolIPv6)),
+					//Will be removed when we update options.MetadataOptions.HTTPPutResponseHopLimit type to be int32
+					//nolint: gosec
+					HttpPutResponseHopLimit: lo.ToPtr(int32(lo.FromPtr(options.MetadataOptions.HTTPPutResponseHopLimit))),
+					HttpTokens:              ec2types.LaunchTemplateHttpTokensState(lo.FromPtr(options.MetadataOptions.HTTPTokens)),
+					// We statically set the InstanceMetadataTags to "disabled" for all new instances since
+					// account-wide defaults can override instance defaults on metadata settings
+					// This can cause instance failure on accounts that default to instance tags since Karpenter
+					// can't support instance tags with its current tags (e.g. kubernetes.io/cluster/*, karpenter.k8s.aws/ec2nodeclass)
+					// See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html#instance-metadata-options-order-of-precedence
+					InstanceMetadataTags: ec2types.LaunchTemplateInstanceMetadataTagsStateDisabled,
+				},
+				NetworkInterfaces: networkInterfaces,
+				TagSpecifications: launchTemplateDataTags,
 			},
-			NetworkInterfaces: networkInterfaces,
-			TagSpecifications: launchTemplateDataTags,
-		},
-		TagSpecifications: []ec2types.TagSpecification{
-			{
-				ResourceType: ec2types.ResourceTypeLaunchTemplate,
-				Tags:         utils.EC2MergeTags(options.Tags),
+			TagSpecifications: []ec2types.TagSpecification{
+				{
+					ResourceType: ec2types.ResourceTypeLaunchTemplate,
+					Tags:         utils.EC2MergeTags(options.Tags),
+				},
 			},
-		},
+		}
 	}
 	// Gate this specifically since the update to CapacityReservationPreference will opt od / spot launches out of open
 	// ODCRs, which is a breaking change from the pre-native ODCR support behavior.
