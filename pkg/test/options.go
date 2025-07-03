@@ -34,7 +34,6 @@ type OptionsFields struct {
 	ReservedENIs            *int
 	MaxPodsExtraCapacity    *int
 	MaxPodsLimit            *int
-	HostnameType            *string
 }
 
 func Options(overrides ...OptionsFields) *options.Options {
@@ -55,6 +54,5 @@ func Options(overrides ...OptionsFields) *options.Options {
 		ReservedENIs:            lo.FromPtrOr(opts.ReservedENIs, 0),
 		MaxPodsExtraCapacity:    lo.FromPtrOr(opts.MaxPodsExtraCapacity, 2),
 		MaxPodsLimit:            lo.FromPtrOr(opts.MaxPodsLimit, -1),
-		HostnameType:            lo.FromPtrOr(opts.HostnameType, "ip-name"),
 	}
 }
