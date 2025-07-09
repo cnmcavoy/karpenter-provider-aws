@@ -44,7 +44,6 @@ type Options struct {
 	ReservedENIs            int
 	MaxPodsExtraCapacity    int
 	MaxPodsLimit            int
-	HostnameType            string
 }
 
 func (o *Options) AddFlags(fs *coreoptions.FlagSet) {
@@ -58,7 +57,6 @@ func (o *Options) AddFlags(fs *coreoptions.FlagSet) {
 	fs.IntVar(&o.ReservedENIs, "reserved-enis", env.WithDefaultInt("RESERVED_ENIS", 0), "Reserved ENIs are not included in the calculations for max-pods or kube-reserved. This is most often used in the VPC CNI custom networking setup https://docs.aws.amazon.com/eks/latest/userguide/cni-custom-network.html.")
 	fs.IntVar(&o.MaxPodsExtraCapacity, "max-pods-extra-capacity", env.WithDefaultInt("MAX_PODS_EXTRA_CAPACITY", 2), "Extra pod capacity allocatable on nodes due to host networked pods that do not consume ENIs. The default is for aws-cni and kube-proxy pods, which are not included in the calculations for max-pods or kube-reserved.")
 	fs.IntVar(&o.MaxPodsLimit, "max-pods-limit", env.WithDefaultInt("MAX_PODS_LIMIT", -1), "The maximum value of max-pods that can be reached when max-pods is computed dynamically. A negative value (the default) means that no limit is enforced.")
-	fs.StringVar(&o.HostnameType, "hostname-type", env.WithDefaultString("HOSTNAME_TYPE", "ip-name"), "The type of hostname for EC2 instances. Valid values are either ip-name or resource-name.")
 }
 
 func (o *Options) Parse(fs *coreoptions.FlagSet, args ...string) error {
